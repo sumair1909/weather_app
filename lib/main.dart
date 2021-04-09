@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:html';
+//import 'dart:html';
 //import 'package:geocoding/geocoding.dart';
 //import 'dart:html';
-//import 'package:geocoder/geocoder.dart';
+import 'package:geocoder/geocoder.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -17,8 +17,8 @@ void main() {
   runApp(MaterialApp(home: MyApp()));
 }
 
-/*TimeOfDay time1 = TimeOfDay.now();
-DateTime date = DateTime.now();*/
+TimeOfDay time1 = TimeOfDay.now();
+DateTime date = DateTime.now();
 
 class MyApp extends StatefulWidget {
   MyApp({Key key}) : super(key: key);
@@ -35,19 +35,27 @@ class _MyAppState extends State<MyApp> {
   dynamic latitudeData = "";
   dynamic longitudeData = "";
   String currentCity;
-  List<String> some=[];
-  Future<List<String>> getCurrentLocation() async {
+
+  Future getCurrentLocation() async {
     final geoposition = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.best);
     setState(() {
-      latitudeData = geoposition.latitude;
-      longitudeData = geoposition.longitude;
+      latitudeData = geoposition.latitude.toString();
+      longitudeData = geoposition.longitude.toString();
     });
-    some = [geoposition.latitude.toString(),geoposition.longitude.toString()];
-
   }
 
-  Future getWeather(String lat,lon) async {
+  getAddress() async {
+    final coordinates = new Coordinates(latitudeData, longitudeData);
+    var addresses =
+        await Geocoder.local.findAddressesFromCoordinates(coordinates);
+    currentCity = addresses.first.locality;
+    setState(() {
+      currentCity = addresses.first.locality;
+    });
+  }
+
+  getWeather() async {
     // getCurrentLocation();
     var queryParameters = {
       'lat': latitudeData.toString(),
@@ -72,12 +80,12 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    
+
     getCurrentLocation();
-    Timer(Duration(seconds: 5), (){
-       getWeather(some[0],some[1]);
+    Timer(Duration(seconds: 3), () {
+      getAddress();
+      getWeather();
     });
-    
   }
 
   @override
@@ -102,18 +110,15 @@ class _MyAppState extends State<MyApp> {
         body: Container(
           child: Stack(
             children: [
-              Image.asset('assets/sunny.jpg',
-                  fit: BoxFit.cover,
-                  height: double.infinity,
-                  width: double.infinity),
-              /*if(time1.hour>=06 && time1.hour<17)
-                  Image.asset('assets/sunny.jpg',
-                  fit: BoxFit.cover,
-                  height: double.infinity,
-                  width: double.infinity),
-                  'assets/Night.jpg'
-                  */
-
+              time1.hour >= 06 && time1.hour < 17
+                  ? Image.asset('assets/sunny.jpg',
+                      fit: BoxFit.cover,
+                      height: double.infinity,
+                      width: double.infinity)
+                  : Image.asset('assets/Night.jpg',
+                      fit: BoxFit.cover,
+                      height: double.infinity,
+                      width: double.infinity),
               Container(
                 decoration: BoxDecoration(color: Colors.black38),
               ),
@@ -133,7 +138,7 @@ class _MyAppState extends State<MyApp> {
                             children: [
                               SizedBox(height: 100),
                               Text(
-                                '${latitudeData},${longitudeData}',
+                                'The Weather in Your Location is',
                                 style: GoogleFonts.lato(
                                     fontSize: 35,
                                     fontWeight: FontWeight.bold,
@@ -161,13 +166,20 @@ class _MyAppState extends State<MyApp> {
                                 ),
                                 Row(
                                   children: [
-                                    SvgPicture.asset('assets/sun.svg',
-                                        height: 32,
-                                        width: 32,
-                                        color: Colors.white),
+                                    time1.hour >= 06 && time1.hour < 17
+                                        ? SvgPicture.asset('assets/sun.svg',
+                                            height: 32,
+                                            width: 32,
+                                            color: Colors.white)
+                                        : SvgPicture.asset('assets/moon.svg',
+                                            height: 32,
+                                            width: 32,
+                                            color: Colors.white),
                                     SizedBox(width: 7),
                                     Text(
-                                      'Morning',
+                                      time1.hour >= 06 && time1.hour < 17
+                                          ? 'Morning'
+                                          : 'Night',
                                       style: GoogleFonts.lato(
                                           fontSize: 22,
                                           color: Colors.white,
@@ -265,7 +277,8 @@ class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage> {
   var temperature, desc, humid, ws;
-  final controller = TextEditingController();
+  String city;
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -280,7 +293,9 @@ class _SearchPageState extends State<SearchPage> {
                   child: SizedBox(
                       width: 250,
                       child: TextField(
-                        controller: controller,
+                        onChanged: (val) {
+                          city = val.toString();
+                        },
                         cursorColor: Colors.black,
                         decoration: InputDecoration(
                             hintText: 'Enter City Here',
@@ -300,6 +315,29 @@ class _SearchPageState extends State<SearchPage> {
               ElevatedButton(
                   onPressed: () {
                     getOnSearch();
+                    Timer(Duration(milliseconds: 1500), (){
+                      setState(() {
+                        showDialog(
+                        context: context,
+                        builder: (BuildContext context) {
+                          return AlertDialog(
+                            title: Text("Weather",
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.pacifico()),
+                            content: Text(
+                                'Temperature: $temperature \u2103\n'
+                                        'Windspeed: $ws Km/hr\n'
+                                        'Description: $desc\n'
+                                        'Humidity: $humid' +
+                                    '%',
+                                style: GoogleFonts.lato()),
+                          );
+                        });
+                        
+                      });
+                    });
+
+                    
                   },
                   child: Text('Search',
                       style: GoogleFonts.lato(
@@ -315,7 +353,7 @@ class _SearchPageState extends State<SearchPage> {
 
   getOnSearch() async {
     var queryParameters = {
-      'q':'Mumbai' ,
+      'q': city,
       'appid': 'b036a111ab0f1bb3da5ae84737da45ad',
       'units': 'metric'
     };
@@ -332,5 +370,3 @@ class _SearchPageState extends State<SearchPage> {
     });
   }
 }
-
-
